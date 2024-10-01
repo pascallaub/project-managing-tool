@@ -132,12 +132,21 @@ def aufgabe_del():
         else:
             print(projekt['Aufgaben'])
             welche = input("Welche Aufgaben möchtest du löschen? Tippe hier: ")
+            aufgaben_suche = list(filter(lambda aufgabe: aufgabe['Titel'] == welche, projekt['Aufgaben']))
+
+        if not aufgaben_suche:
+            print("Keine Aufgabe gefunden!")
+            return
+        
+        aufgabe_ergebnis = aufgaben_suche[0]
+        check = input(f"Möchtest du diese Aufgabe {aufgabe_ergebnis} löschen? j/n: ").lower()
+        if check == 'j':
+            index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == welche)
+            projekt['Aufgaben'][index].clear()
+            print("Aufgabe gelöscht!")
             
-            if welche in projekt['Aufgaben']:
-                projekt['Aufgaben'].remove(welche)
-                print(f"Aufgabe {welche} gelöscht!")
-            else:
-                print("Vorgang beendet!")
+        else:
+            print("Vorgang beendet!")
     else:
         print("Vorgang beendet!")
 
