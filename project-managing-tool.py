@@ -1,3 +1,5 @@
+from datetime import datetime
+
 projekte = []
 aufgaben = []
 
@@ -103,7 +105,7 @@ def aufgabe_bearbeiten():
             neuer_titel = input("Gib den neuen Titel der Aufgabe ein: ")
             neue_beschreibung = input("Gib eine neue Beschreibung ein: ")
             neues_datum = input("Gib ein neues Datum ein: ")
-            neuer_status = input("Gib einen neuen Status ein: ")
+            neuer_status = input("Gib einen neuen Status ein (offen, in bearbeitung, verschoben, erledigt): ")
             index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == aufgaben_alt)
             projekt['Aufgaben'][index] = {'Titel': neuer_titel, 'Beschreibung': neue_beschreibung, 'Datum': neues_datum, 'Status': neuer_status}
             print("Bearbeitete Aufgabe zum Projekt hinzugefügt!")
@@ -151,7 +153,25 @@ def aufgabe_del():
         print("Vorgang beendet!")
 
 def aufgabe_sort():
-    pass
+    aufgabe = input("Die Aufgaben welches Projektes möchtest du sortieren? ")
+    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+
+    if not ergebnis:
+        print("Kein Projekt gefunden!")
+        return
+    
+    projekt = ergebnis[0]
+    korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
+    if korrekt == 'j':
+        ordnung = input("Möchtest du nach Datum oder Status sortieren? d/s: ").lower()
+        if ordnung == 'd':
+            ordnung_datum = sorted(projekt['Aufgaben'], key=lambda aufgabe: datetime.strptime(aufgabe['Datum'], '%d.%m.%Y'))
+            print(ordnung_datum)
+        elif ordnung == 's':
+            ordnung_status = sorted(projekt['Aufgaben'], key=lambda aufgabe: aufgabe['Status'])
+            print(ordnung_status)
+        else:
+            print("Falsche Eingabe!")
 
 def aufgabe_erledigt():
     pass
@@ -186,6 +206,12 @@ def menu():
                 continue
             elif auswahl_menu == '8':
                 aufgabe_del()
+                continue
+            elif auswahl_menu == '9':
+                aufgabe_sort()
+                continue
+            elif auswahl_menu == '10':
+                aufgabe_erledigt()
                 continue
             elif auswahl_menu == '11':
                 beenden()
