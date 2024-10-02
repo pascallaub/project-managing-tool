@@ -2,7 +2,7 @@
 
 ## Installation
 
-Python 3 muss auf deinem Rechner installiert sein. Du kannst es hier herunterladen.
+Python 3 muss auf deinem Rechner installiert sein. 
 Speichere den Code in einer Datei, z.B. projektmanager.py.
 
 ## Ausführung
