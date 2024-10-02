@@ -1,0 +1,21 @@
+[
+    {
+        "Projektname": "Garage",
+        "Startdatum": "1.1.1",
+        "Priorit\u00e4t": "hoch",
+        "Aufgaben": [
+            {
+                "Titel": "Katze",
+                "Beschreibung": "Katze",
+                "Datum": "1.1.1",
+                "Status": "offen"
+            },
+            {
+                "Titel": "Hund",
+                "Beschreibung": "Hund",
+                "Datum": "1.1.1",
+                "Status": "offen"
+            }
+        ]
+    }
+]

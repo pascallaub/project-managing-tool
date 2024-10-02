@@ -1,6 +1,19 @@
 from datetime import datetime
+import json
+import os
 
-projekte = []
+projekte = 'Projekte.jason'
+
+def projekte_laden():
+    if os.path.exists(projekte):
+        with open(projekte, 'r') as file:
+            return json.load(file)
+    return []
+
+def projekt_speichern(projekt_neu):
+    with open(projekte, 'w') as file:
+        json.dump(projekt_neu, file, indent=4)
+    
 aufgaben = []
 
 
@@ -8,25 +21,33 @@ def neues_projekt():
     projekt_name = input("Projektname: ")
     projekt_start = input("Startdatum: ")
     projekt_prio = input("Priorität: ")
-    projekte.append({'Projektname': projekt_name, 'Startdatum': projekt_start, 'Priorität': projekt_prio, 'Aufgaben': aufgaben})
+    projekt = ({'Projektname': projekt_name, 'Startdatum': projekt_start, 'Priorität': projekt_prio, 'Aufgaben': aufgaben})
+    projekte_neu = projekte_laden()
+    projekte_neu.append(projekt)
+    projekt_speichern(projekte_neu)
+    print("Projekt hinzugefügt!")
 
 def projekt_anzeigen():
-    print(projekte)
+    projekte_anzeigen = projekte_laden()
+    print(projekte_anzeigen)
 
 def projekt_bearbeiten():
     suche = input("Gib den Projektnamen ein: ")
-    ergebnis = list(filter(lambda projekt: projekt["Projektname"] == suche, projekte))
-
-    if not ergebnis:
+    projekte_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in projekte_neu if suche in projekt['Projektname']]
+    
+    if not gefundene_projekte:
         print("Projekt nicht gefunden!")
         return
     
-    projekt = ergebnis[0]       #Gibt nur das erste Projekt aus bei mehreren
-    aendern = input(f"Möchtest du dieses {ergebnis} ändern? j/n: ").lower()
+    projekt = gefundene_projekte[0]
+    
+    aendern = input(f"Ist dies {gefundene_projekte} das richtige Projekt? j/n: ").lower()
 
     if aendern == 'j':
         neuer_name = input("Neuer Projektname: ")
         projekt['Projektname'] = neuer_name
+        projekt_speichern(projekte_neu)
         print("Projektname geändert!")
     else:
         print("Keine Änderung vorgenommen!")
@@ -34,37 +55,44 @@ def projekt_bearbeiten():
 
 def projekt_del():
     suche = input("Gib den Projektnamen ein: ")
-    ergebnis = list(filter(lambda projekt: projekt["Projektname"] == suche, projekte))
-        
-    if not ergebnis:
+    projekt_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in projekt_neu if suche == projekt['Projektname']]
+    
+    if not gefundene_projekte:
         print("Projekt nicht gefunden!")
         return
-        
-    projekt = ergebnis[0]
-    delete = input(f"Möchtest du dieses {ergebnis} löschen? j/n: ").lower()
+    
+    projekt = gefundene_projekte[0]
+    delete = input(f"Möchtest du dieses {gefundene_projekte} löschen? j/n: ").lower()
     if delete == 'j':
-        projekte.remove(projekt)
-        print(f"Das Projekt {ergebnis} wurde gelöscht!")
+        projekt_neu.remove(projekt)
+        print(f"Das Projekt {gefundene_projekte} wurde gelöscht!")
+        projekt_speichern(projekt_neu)
     else:
         print("Löschen abgebrochen!")
 
 
 def neue_aufgabe():
     aufgabe = input("Welchem Projekt möchtest du eine Aufgabe hinzufügen? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+    aufgabe_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
 
-    if not ergebnis:
+    if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
-    projekt = ergebnis[0]
+    projekt = gefundene_projekte[0]
     korrekt = input(f"Möchtest du diesem Projekt {projekt} Aufgaben hinzufügen? j/n: ").lower()
     if korrekt == 'j':
         titel = input("Wie ist der Titel der Aufgabe? ")
         beschreibnung = input("Beschreibe die Aufgabe: ")
         datum = input("Fälligkeitsdatum: ")
         status = input("Status (offen, in bearbeitung, verschoben, erledigt): ")
-        projekt['Aufgaben'].append({'Titel': titel, 'Beschreibung': beschreibnung, 'Datum': datum, 'Status': status})
+        aufgabe_eintrag = ({'Titel': titel, 'Beschreibung': beschreibnung, 'Datum': datum, 'Status': status})
+        if 'Aufgaben' not in projekt or not isinstance(projekt['Aufgaben'], list):
+            projekt['Aufgaben'] = []
+        projekt['Aufgaben'].append(aufgabe_eintrag)
+        projekt_speichern(aufgabe_neu)
         print("Aufgaben zum Projekt hinzugefügt!")
     else:
         print("Abgebrochen!")
@@ -72,42 +100,39 @@ def neue_aufgabe():
 
 def aufgaben_anzeigen():
     aufgabe = input("Die Aufgaben welches Projektes möchtest du anzeigen? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+    aufgabe_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
 
-    if not ergebnis:
+    if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
-
-    projekt = ergebnis[0]
+    
+    projekt = gefundene_projekte[0]
     print(projekt['Aufgaben'])
 
 def aufgabe_bearbeiten():
     aufgabe = input("Die Aufgaben welches Projektes möchtest du bearbeiten? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+    aufgabe_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
 
-    if not ergebnis:
+    if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
-    projekt = ergebnis[0]
+    projekt = gefundene_projekte[0]
     korrekt = input(f"Möchtest du die Aufgaben dieses Projekts {projekt} ändern? j/n: ").lower()
     if korrekt == 'j':
         aufgaben_alt = input("Welche Aufgabe möchtest du bearbeiten? ")
-        aufgaben_suche = list(filter(lambda aufgabe: aufgabe['Titel'] == aufgaben_alt, projekt['Aufgaben']))
-
-        if not aufgaben_suche:
-            print("Keine Aufgabe gefunden!")
-            return
-        
-        aufgabe_ergebnis = aufgaben_suche[0]
-        check = input(f"Möchtest du diese Aufgabe {aufgabe_ergebnis} bearbeiten? j/n: ").lower()
-        if check == 'j':
+        gefundene_aufgabe = [aufgabe for aufgabe in projekt['Aufgaben'] if aufgaben_alt == aufgabe['Titel']]
+        abfrage = input(f"Ist das {gefundene_aufgabe} die richtige Aufagbe? j/n: ")
+        if abfrage == 'j':
             neuer_titel = input("Gib den neuen Titel der Aufgabe ein: ")
             neue_beschreibung = input("Gib eine neue Beschreibung ein: ")
             neues_datum = input("Gib ein neues Datum ein: ")
             neuer_status = input("Gib einen neuen Status ein (offen, in bearbeitung, verschoben, erledigt): ")
-            index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == aufgaben_alt)
+            index = projekt['Aufgaben'].index(gefundene_aufgabe[0])
             projekt['Aufgaben'][index] = {'Titel': neuer_titel, 'Beschreibung': neue_beschreibung, 'Datum': neues_datum, 'Status': neuer_status}
+            projekt_speichern(aufgabe_neu)
             print("Bearbeitete Aufgabe zum Projekt hinzugefügt!")
         else:
             print("Aufgabe nicht gefunden!")
@@ -118,13 +143,14 @@ def aufgabe_bearbeiten():
 
 def aufgabe_del():
     aufgabe = input("Die Aufgaben welches Projektes möchtest du löschen? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+    aufgabe_neu = projekte_laden()
+    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
 
-    if not ergebnis:
+    if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
-    projekt = ergebnis[0]
+    projekt = gefundene_projekte[0]
     korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
     if korrekt == 'j':
         alle = input("Möchtest du alle Aufgaben löschen? j/n: ").lower()
@@ -133,22 +159,15 @@ def aufgabe_del():
             print("Alle Aufgaben gelöscht!")
         else:
             print(projekt['Aufgaben'])
-            welche = input("Welche Aufgaben möchtest du löschen? Tippe hier: ")
-            aufgaben_suche = list(filter(lambda aufgabe: aufgabe['Titel'] == welche, projekt['Aufgaben']))
+            welche = input("Welche Aufgabe möchtest du löschen? Tippe hier: ")
+            gefundene_aufgabe = [aufgabe for aufgabe in projekt['Aufgaben'] if welche == aufgabe['Titel']]
+            projekt['Aufgaben'].remove(gefundene_aufgabe[0])
+            projekt_speichern(aufgabe_neu)
+            print("Aufgabe erfolgreich gelöscht!")
 
-        if not aufgaben_suche:
+        if not welche:
             print("Keine Aufgabe gefunden!")
             return
-        
-        aufgabe_ergebnis = aufgaben_suche[0]
-        check = input(f"Möchtest du diese Aufgabe {aufgabe_ergebnis} löschen? j/n: ").lower()
-        if check == 'j':
-            index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == welche)
-            projekt['Aufgaben'][index].clear()
-            print("Aufgabe gelöscht!")
-            
-        else:
-            print("Vorgang beendet!")
     else:
         print("Vorgang beendet!")
 
