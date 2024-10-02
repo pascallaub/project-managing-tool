@@ -63,7 +63,7 @@ def neue_aufgabe():
         titel = input("Wie ist der Titel der Aufgabe? ")
         beschreibnung = input("Beschreibe die Aufgabe: ")
         datum = input("Fälligkeitsdatum: ")
-        status = input("Status: ")
+        status = input("Status (offen, in bearbeitung, verschoben, erledigt): ")
         projekt['Aufgaben'].append({'Titel': titel, 'Beschreibung': beschreibnung, 'Datum': datum, 'Status': status})
         print("Aufgaben zum Projekt hinzugefügt!")
     else:
@@ -174,7 +174,33 @@ def aufgabe_sort():
             print("Falsche Eingabe!")
 
 def aufgabe_erledigt():
-    pass
+    aufgabe = input("Die Aufgabe welches Projektes möchtest du als erledigt markieren? ")
+    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
+
+    if not ergebnis:
+        print("Kein Ergebnis!")
+        return
+    
+    projekt = ergebnis[0]
+    korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
+    if korrekt == 'j':
+        aufgabe_erledigt = input("Welche Aufgabe möchtest du als erledigt markieren? ")
+        aufgaben_suche = list(filter(lambda aufgabe: aufgabe['Titel'] == aufgabe_erledigt, projekt['Aufgaben']))
+
+        if not aufgaben_suche:
+            print("Keine Aufgabe gefunden!")
+            return
+        
+        aufgabe_ergebnis = aufgaben_suche[0]
+        check = input(f"Möchtest du diese Aufgabe {aufgabe_ergebnis} als erledigt markieren? j/n: ").lower()
+        if check == 'j':
+            neuer_status = input("Gib einen neuen Status ein (offen, in bearbeitung, verschoben, erledigt): ")
+            index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == aufgabe_erledigt)
+            projekt['Aufgaben'][index]['Status'] = neuer_status
+            print("Aufgabe als erledigt markiert!")
+        else:
+            print("Aufgabe nicht gefunden!")
+
 
 def beenden():
     quit()
