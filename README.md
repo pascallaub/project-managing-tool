@@ -9,9 +9,8 @@ Speichere den Code in einer Datei, z.B. projektmanager.py.
 
 Um das Skript auszuführen, öffne ein Terminal und navigiere in das Verzeichnis, in dem die Datei gespeichert ist. Verwende dann folgenden Befehl:
 
-bash
-Code kopieren
-python projektmanager.py
+### python projektmanager.py
+
 Das Menü wird angezeigt, und du kannst durch Eingabe der entsprechenden Zahl die gewünschte Funktion auswählen.
 
 # Funktionen
