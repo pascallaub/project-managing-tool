@@ -219,83 +219,94 @@ def aufgabe_bearbeiten():
 
 
 def aufgabe_del():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     aufgabe = input("Die Aufgaben welches Projektes möchtest du löschen? ")
-    aufgabe_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
 
     if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
     projekt = gefundene_projekte[0]
-    korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
-    if korrekt == 'j':
-        alle = input("Möchtest du alle Aufgaben löschen? j/n: ").lower()
-        if alle == 'j':
-            projekt['Aufgaben'].clear()
-            print("Alle Aufgaben gelöscht!")
-        else:
-            print(projekt['Aufgaben'])
-            welche = input("Welche Aufgabe möchtest du löschen? Tippe hier: ")
-            gefundene_aufgabe = [aufgabe for aufgabe in projekt['Aufgaben'] if welche == aufgabe['Titel']]
-            projekt['Aufgaben'].remove(gefundene_aufgabe[0])
-            projekt_speichern(aufgabe_neu)
-            print("Aufgabe erfolgreich gelöscht!")
+    projekt_id = projekt[0]
 
-        if not welche:
-            print("Keine Aufgabe gefunden!")
-            return
+    cursor.execute("SELECT * FROM aufgaben WHERE projekt_id = ?", (projekt_id,))
+    gefundene_aufgaben = cursor.fetchall()
+    
+    if not gefundene_aufgaben:
+        print(f"Keine Aufgaben für das Projekt {aufgabe} gefunden!")
+        projekte.close()
+        return
+    
+    print(f"Aufgaben für das Projekt {aufgabe}: ")
+    for idx, aufgabe in enumerate(gefundene_aufgaben):
+        print(f"{idx + 1}. Titel: {aufgabe[2]}, Beschreibung: {aufgabe[3]}, Fälligkeitsdatum: {aufgabe[4]}, Status: {aufgabe[5]}")
+
+    aufgaben_index = int(input("Welche Aufgabe möchtest du löschen? (Nummer eingeben): ")) - 1
+
+    if 0 <= aufgaben_index < len(gefundene_aufgaben):
+        auszuwaehlende_aufgabe = gefundene_aufgaben[aufgaben_index]
+
+        cursor.execute("DELETE FROM aufgaben WHERE projekt_id = ?", (projekt[0],))
+        print("Ausgabe erfolgreich gelöscht!")
+        projekte.commit()
+        projekte.close()
     else:
-        print("Vorgang beendet!")
+        print("Keine Auswahl getroffen!")
+        projekte.close()
 
-def aufgabe_sort():
-    aufgabe = input("Die Aufgaben welches Projektes möchtest du sortieren? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
 
-    if not ergebnis:
+def aufgabe_erledigt():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
+    aufgabe = input("Die Aufgaben welches Projektes möchtest du als erledigt markieren? ")
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
+
+    if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
-    projekt = ergebnis[0]
-    korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
-    if korrekt == 'j':
-        ordnung = input("Möchtest du nach Datum oder Status sortieren? d/s: ").lower()
-        if ordnung == 'd':
-            ordnung_datum = sorted(projekt['Aufgaben'], key=lambda aufgabe: datetime.strptime(aufgabe['Datum'], '%d.%m.%Y'))
-            print(ordnung_datum)
-        elif ordnung == 's':
-            ordnung_status = sorted(projekt['Aufgaben'], key=lambda aufgabe: aufgabe['Status'])
-            print(ordnung_status)
-        else:
-            print("Falsche Eingabe!")
+    projekt = gefundene_projekte[0]
+    projekt_id = projekt[0]
 
-def aufgabe_erledigt():
-    aufgabe = input("Die Aufgabe welches Projektes möchtest du als erledigt markieren? ")
-    ergebnis = list(filter(lambda projekt: projekt['Projektname'] == aufgabe, projekte))
-
-    if not ergebnis:
-        print("Kein Ergebnis!")
+    cursor.execute("SELECT * FROM aufgaben WHERE projekt_id = ?", (projekt_id,))
+    gefundene_aufgaben = cursor.fetchall()
+    
+    if not gefundene_aufgaben:
+        print(f"Keine Aufgaben für das Projekt {aufgabe} gefunden!")
+        projekte.close()
         return
     
-    projekt = ergebnis[0]
-    korrekt = input(f"Ist dies {projekt} das richtige Projekt? j/n: ").lower()
-    if korrekt == 'j':
-        aufgabe_erledigt = input("Welche Aufgabe möchtest du als erledigt markieren? ")
-        aufgaben_suche = list(filter(lambda aufgabe: aufgabe['Titel'] == aufgabe_erledigt, projekt['Aufgaben']))
+    print(f"Aufgaben für das Projekt {aufgabe}: ")
+    for idx, aufgabe in enumerate(gefundene_aufgaben):
+        print(f"{idx + 1}. Titel: {aufgabe[2]}, Beschreibung: {aufgabe[3]}, Fälligkeitsdatum: {aufgabe[4]}, Status: {aufgabe[5]}")
 
-        if not aufgaben_suche:
-            print("Keine Aufgabe gefunden!")
-            return
+    aufgaben_index = int(input("Welche Aufgabe möchtest du als erledigt markieren? (Nummer eingeben): ")) - 1
+
+    if 0 <= aufgaben_index < len(gefundene_aufgaben):
+        auszuwaehlende_aufgabe = gefundene_aufgaben[aufgaben_index]
+
+        neuer_status = input(f"Neuer Status (aktuell: {auszuwaehlende_aufgabe[5]}): ") or auszuwaehlende_aufgabe[5]
+
+        cursor.execute('''
+            UPDATE aufgaben
+            SET status = ?
+            WHERE id = ?''', 
+            (neuer_status, auszuwaehlende_aufgabe[0]))
         
-        aufgabe_ergebnis = aufgaben_suche[0]
-        check = input(f"Möchtest du diese Aufgabe {aufgabe_ergebnis} als erledigt markieren? j/n: ").lower()
-        if check == 'j':
-            neuer_status = input("Gib einen neuen Status ein (offen, in bearbeitung, verschoben, erledigt): ")
-            index = next(i for i, aufgabe in enumerate(projekt['Aufgaben']) if aufgabe['Titel'] == aufgabe_erledigt)
-            projekt['Aufgaben'][index]['Status'] = neuer_status
-            print("Aufgabe als erledigt markiert!")
-        else:
-            print("Aufgabe nicht gefunden!")
+        projekte.commit()
+        print("Aufgabe erfolgreich als erledigt markiert!")
+    else:
+        print("Ungültige Auswahl. Vorgang abgebrochen!")
+
+    projekte.close()
 
 
 def beenden():
