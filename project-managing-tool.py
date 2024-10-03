@@ -383,4 +383,5 @@ def menu():
         except ValueError:
             print("Falsche Eingabe!")
 
-menu()
+if __name__=='__main__':
+    menu()
