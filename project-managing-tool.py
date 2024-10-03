@@ -1,6 +1,7 @@
 from datetime import datetime
 import sqlite3
 import hashlib
+import getpass
 
 def database_connection():
     return sqlite3.connect("ProjekteDB/projects.db")
@@ -397,8 +398,18 @@ def register():
             ''')
 
     username = input("Wähle einen Benutzernamen: ")
-    passwort = input("Wähle ein Passwort: ")
-    passwort_check = input("Wiederhole dein Passwort: ")
+
+    cursor.execute("SELECT * FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor.fetchone()
+
+    if result:
+        print("Benutzername bereits vergeben! Wähle einen anderen!")
+        login_connection.close()
+        register()
+        return
+    
+    passwort = getpass.getpass("Wähle ein Passwort: ")
+    passwort_check = getpass.getpass("Wiederhole dein Passwort: ")
 
     if passwort_check == passwort:
             passwort_hash = hashlib.pbkdf2_hmac(
@@ -421,7 +432,7 @@ def login_menu():
     cursor = login_connection.cursor()
 
     username = input("Benutzername: ")
-    password = input("Passwort: ")
+    password = getpass.getpass("Passwort: ")
 
     cursor.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
     result = cursor.fetchone()
