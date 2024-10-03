@@ -259,6 +259,37 @@ def aufgabe_del():
         print("Keine Auswahl getroffen!")
         projekte.close()
 
+def aufgabe_sort():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
+    aufgabe = input("Die Aufgaben welches Projektes möchtest du sortiert anzeigen? ")
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
+
+    if not gefundene_projekte:
+        print("Kein Projekt gefunden!")
+        return
+    
+    projekt = gefundene_projekte[0]
+    projekt_id = projekt[0]
+
+    cursor.execute("SELECT * FROM aufgaben WHERE projekt_id = ?", (projekt_id,))
+    gefundene_aufgaben = cursor.fetchall()
+    
+    if not gefundene_aufgaben:
+        print(f"Keine Aufgaben für das Projekt {aufgabe} gefunden!")
+        projekte.close()
+        return
+    
+    cursor.execute("SELECT * FROM `aufgaben` ORDER BY `titel`")
+    for datensatz in cursor:
+        print(datensatz)
+        
+    projekte.close()
+
+
 
 def aufgabe_erledigt():
     projekte = database_connection()
@@ -311,6 +342,7 @@ def aufgabe_erledigt():
 
 def beenden():
     quit()
+
 
 def menu():
     while True:
