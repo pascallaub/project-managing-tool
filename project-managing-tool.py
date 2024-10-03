@@ -1,8 +1,12 @@
 from datetime import datetime
 import sqlite3
+import hashlib
 
 def database_connection():
     return sqlite3.connect("ProjekteDB/projects.db")
+
+def user_database():
+    return sqlite3.connect("UserDB/user.db")
     
 aufgaben = []
 
@@ -381,5 +385,80 @@ def menu():
         except ValueError:
             print("Falsche Eingabe!")
 
+def register():
+    login_connection = user_database()
+    cursor = login_connection.cursor()
+
+    cursor.execute('''
+                CREATE TABLE IF NOT EXISTS userdata (
+                benutzername TEXT NOT NULL,
+                passwort BLOB NOT NULL
+                )
+            ''')
+
+    username = input("Wähle einen Benutzernamen: ")
+    passwort = input("Wähle ein Passwort: ")
+    passwort_check = input("Wiederhole dein Passwort: ")
+
+    if passwort_check == passwort:
+            passwort_hash = hashlib.pbkdf2_hmac(
+                'sha256',
+                passwort.encode('utf-8'),
+                b'some_salt',
+                100000
+            )
+            cursor.execute("INSERT INTO userdata (benutzername, passwort) VALUES(?,?)", (username, passwort_hash))
+            login_connection.commit()
+    else:
+        print("Falsche Eingabe. Starte Vorgang erneut!")
+        register()
+
+    login_connection.close()
+    login_menu()
+
+def login_menu():
+    login_connection = user_database()
+    cursor = login_connection.cursor()
+
+    username = input("Benutzername: ")
+    password = input("Passwort: ")
+
+    cursor.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor.fetchone()
+
+    if result:
+        stored_passwaord_hash = result[0]
+
+        passwort_hash = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            b'some_salt',
+            100000
+        )
+
+        if passwort_hash == stored_passwaord_hash:
+            print("Login erfolgreich!")
+            menu()
+        
+        else:
+            print("Ungültiges Passwort!")
+    else:
+        print("Benutzername nicht gefunden!")
+    
+    login_connection.closer()
+
+def start_menu():
+    login = input("Einloggen (1) oder Registrieren (2): ")
+    if login == '1':
+        login_menu()
+    elif login == '2':
+        register()
+    else:
+        print("Falsche Eingabe!")
+        start_menu()
+
+
+
+
 if __name__=='__main__':
-    menu()
+    start_menu()
