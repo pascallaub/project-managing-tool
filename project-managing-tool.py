@@ -1,43 +1,52 @@
 from datetime import datetime
 import json
+import sqlite3
 import os
 
-projekte = 'Projekte.jason'
-
-def projekte_laden():
-    if os.path.exists(projekte):
-        with open(projekte, 'r') as file:
-            return json.load(file)
-    return []
-
-def projekt_speichern(projekt_neu):
-    with open(projekte, 'w') as file:
-        json.dump(projekt_neu, file, indent=4)
+def database_connection():
+    return sqlite3.connect("ProjekteDB/projects.db")
     
 aufgaben = []
 
-
 def neues_projekt():
+    projekte = database_connection()
+    cursor = projekte.cursor()
     projekt_name = input("Projektname: ")
     projekt_start = input("Startdatum: ")
     projekt_prio = input("Priorität: ")
-    projekt = ({'Projektname': projekt_name, 'Startdatum': projekt_start, 'Priorität': projekt_prio, 'Aufgaben': aufgaben})
-    projekte_neu = projekte_laden()
-    projekte_neu.append(projekt)
-    projekt_speichern(projekte_neu)
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS projekte (
+                   id INTEGER PRIMARY KEY AUTOINCREMENT,
+                   projektname TEXT NOT NULL,
+                   startdatum DATE,
+                   prioritaet TEXT
+        )
+    ''')
+    cursor.execute("INSERT INTO projekte (projektname, startdatum, prioritaet) VALUES(?,?,?)", (projekt_name, projekt_start, projekt_prio))
+    projekte.commit()
     print("Projekt hinzugefügt!")
+    projekte.close()
 
 def projekt_anzeigen():
-    projekte_anzeigen = projekte_laden()
-    print(projekte_anzeigen)
+    projekte = database_connection()
+    cursor = projekte.cursor()
+    cursor.execute("SELECT * FROM projekte")
+    inhalt = cursor.fetchall()
+    print(inhalt)
+    projekte.close()
 
 def projekt_bearbeiten():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     suche = input("Gib den Projektnamen ein: ")
-    projekte_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in projekte_neu if suche in projekt['Projektname']]
+
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + suche + '%',))
+    gefundene_projekte = cursor.fetchall()
     
     if not gefundene_projekte:
         print("Projekt nicht gefunden!")
+        projekte.close()
         return
     
     projekt = gefundene_projekte[0]
@@ -46,36 +55,52 @@ def projekt_bearbeiten():
 
     if aendern == 'j':
         neuer_name = input("Neuer Projektname: ")
-        projekt['Projektname'] = neuer_name
-        projekt_speichern(projekte_neu)
+        
+        cursor.execute("UPDATE projekte SET projektname = ? WHERE projektname = ?", (neuer_name, projekt[0]))
+        projekte.commit()
         print("Projektname geändert!")
     else:
         print("Keine Änderung vorgenommen!")
 
+    projekte.close()
+
 
 def projekt_del():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     suche = input("Gib den Projektnamen ein: ")
-    projekt_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in projekt_neu if suche == projekt['Projektname']]
+
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + suche + '%',))
+    gefundene_projekte = cursor.fetchall()
     
     if not gefundene_projekte:
         print("Projekt nicht gefunden!")
+        projekte.close()
         return
     
     projekt = gefundene_projekte[0]
+
     delete = input(f"Möchtest du dieses {gefundene_projekte} löschen? j/n: ").lower()
     if delete == 'j':
-        projekt_neu.remove(projekt)
-        print(f"Das Projekt {gefundene_projekte} wurde gelöscht!")
-        projekt_speichern(projekt_neu)
+        cursor.execute("DELETE FROM projekte WHERE projektname = ?", (projekt[0],))
+        projekte.commit()
+        print("Eintrag erfolgreich gelöscht!")
+        projekte.close()
     else:
         print("Löschen abgebrochen!")
+        projekte.close()
 
 
 def neue_aufgabe():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     aufgabe = input("Welchem Projekt möchtest du eine Aufgabe hinzufügen? ")
-    aufgabe_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
+
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
 
     if not gefundene_projekte:
         print("Kein Projekt gefunden!")
@@ -88,27 +113,58 @@ def neue_aufgabe():
         beschreibnung = input("Beschreibe die Aufgabe: ")
         datum = input("Fälligkeitsdatum: ")
         status = input("Status (offen, in bearbeitung, verschoben, erledigt): ")
-        aufgabe_eintrag = ({'Titel': titel, 'Beschreibung': beschreibnung, 'Datum': datum, 'Status': status})
-        if 'Aufgaben' not in projekt or not isinstance(projekt['Aufgaben'], list):
-            projekt['Aufgaben'] = []
-        projekt['Aufgaben'].append(aufgabe_eintrag)
-        projekt_speichern(aufgabe_neu)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS aufgaben (
+                       id INTEGER PRIMARY KEY AUTOINCREMENT,
+                       projekt_id INTEGER,
+                       titel TEXT,
+                       beschreibung TEXT,
+                       faelligkeitsdatum DATE,
+                       status TEXT,
+                       FOREIGN KEY (projekt_id) REFERENCES projekte(id)
+            )
+        ''')
+        
+        cursor.execute(
+            "INSERT INTO aufgaben (projekt_id, titel, beschreibung, faelligkeitsdatum, status) VALUES (?, ?, ?, ?, ?)",
+            (projekt[0], titel, beschreibnung, datum, status)
+        )
+
         print("Aufgaben zum Projekt hinzugefügt!")
+
+        projekte.commit()
+        projekte.close()
     else:
         print("Abgebrochen!")
+        projekte.close()
 
 
 def aufgaben_anzeigen():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     aufgabe = input("Die Aufgaben welches Projektes möchtest du anzeigen? ")
-    aufgabe_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
 
     if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
     projekt = gefundene_projekte[0]
-    print(projekt['Aufgaben'])
+    projekt_id = projekt[0]
+
+    cursor.execute("SELECT * FROM aufgaben WHERE projekt_id = ?", (projekt_id,))
+    gefundene_aufgaben = cursor.fetchall()
+    
+    if not gefundene_aufgaben:
+        print(f"Keine Aufgaben für das Projekt {aufgabe} gefunden!")
+    else:
+        print(f"Aufgaben für das Projekt {aufgabe}: ")
+        for aufgabe in gefundene_aufgaben:
+            print(f"Titel: {aufgabe[2]}, Beschreibung: {aufgabe[3]}, Fälligkeitsdatum: {aufgabe[4]}, Status: {aufgabe[5]}")
+    projekte.close()
 
 def aufgabe_bearbeiten():
     aufgabe = input("Die Aufgaben welches Projektes möchtest du bearbeiten? ")
