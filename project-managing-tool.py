@@ -167,34 +167,55 @@ def aufgaben_anzeigen():
     projekte.close()
 
 def aufgabe_bearbeiten():
+    projekte = database_connection()
+    cursor = projekte.cursor()
+
     aufgabe = input("Die Aufgaben welches Projektes möchtest du bearbeiten? ")
-    aufgabe_neu = projekte_laden()
-    gefundene_projekte = [projekt for projekt in aufgabe_neu if aufgabe == projekt['Projektname']]
+    cursor.execute("SELECT * FROM projekte WHERE projektname LIKE ?", ('%' + aufgabe + '%',))
+    gefundene_projekte = cursor.fetchall()
+
 
     if not gefundene_projekte:
         print("Kein Projekt gefunden!")
         return
     
     projekt = gefundene_projekte[0]
-    korrekt = input(f"Möchtest du die Aufgaben dieses Projekts {projekt} ändern? j/n: ").lower()
-    if korrekt == 'j':
-        aufgaben_alt = input("Welche Aufgabe möchtest du bearbeiten? ")
-        gefundene_aufgabe = [aufgabe for aufgabe in projekt['Aufgaben'] if aufgaben_alt == aufgabe['Titel']]
-        abfrage = input(f"Ist das {gefundene_aufgabe} die richtige Aufagbe? j/n: ")
-        if abfrage == 'j':
-            neuer_titel = input("Gib den neuen Titel der Aufgabe ein: ")
-            neue_beschreibung = input("Gib eine neue Beschreibung ein: ")
-            neues_datum = input("Gib ein neues Datum ein: ")
-            neuer_status = input("Gib einen neuen Status ein (offen, in bearbeitung, verschoben, erledigt): ")
-            index = projekt['Aufgaben'].index(gefundene_aufgabe[0])
-            projekt['Aufgaben'][index] = {'Titel': neuer_titel, 'Beschreibung': neue_beschreibung, 'Datum': neues_datum, 'Status': neuer_status}
-            projekt_speichern(aufgabe_neu)
-            print("Bearbeitete Aufgabe zum Projekt hinzugefügt!")
-        else:
-            print("Aufgabe nicht gefunden!")
+    projekt_id = projekt[0]
 
+    cursor.execute("SELECT * FROM aufgaben WHERE projekt_id = ?", (projekt_id,))
+    gefundene_aufgaben = cursor.fetchall()
+    
+    if not gefundene_aufgaben:
+        print(f"Keine Aufgaben für das Projekt {aufgabe} gefunden!")
+        projekte.close()
+        return
+    
+    print(f"Aufgaben für das Projekt {aufgabe}: ")
+    for idx, aufgabe in enumerate(gefundene_aufgaben):
+        print(f"{idx + 1}. Titel: {aufgabe[2]}, Beschreibung: {aufgabe[3]}, Fälligkeitsdatum: {aufgabe[4]}, Status: {aufgabe[5]}")
+
+    aufgaben_index = int(input("Welche Aufgabe möchtest du bearbeiten? (Nummer eingeben): ")) - 1
+
+    if 0 <= aufgaben_index < len(gefundene_aufgaben):
+        auszuwaehlende_aufgabe = gefundene_aufgaben[aufgaben_index]
+
+        neuer_titel = input(f"Neuer Titel (aktuell: {auszuwaehlende_aufgabe[2]}): ") or auszuwaehlende_aufgabe[2]
+        neue_beschreibung = input(f"Neue Beschreibung (aktuell: {auszuwaehlende_aufgabe[3]}): ") or auszuwaehlende_aufgabe[3]
+        neues_datum = input(f"Neues Fälligkeitsdatum (aktuell: {auszuwaehlende_aufgabe[4]}): ") or auszuwaehlende_aufgabe[4]
+        neuer_status = input(f"Neuer Status (aktuell: {auszuwaehlende_aufgabe[5]}): ") or auszuwaehlende_aufgabe[5]
+
+        cursor.execute('''
+            UPDATE aufgaben
+            SET titel = ?, beschreibung = ?, faelligkeitsdatum = ?, status = ?
+            WHERE id = ?''', 
+            (neuer_titel, neue_beschreibung, neues_datum, neuer_status, auszuwaehlende_aufgabe[0]))
+        
+        projekte.commit()
+        print("Aufgabe erfolgreich bearbeitet!")
     else:
-        print("Vorgang abgebrochen!")
+        print("Ungültige Auswahl. Vorgang abgebrochen!")
+
+    projekte.close()
 
 
 def aufgabe_del():
