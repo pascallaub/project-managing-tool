@@ -1,7 +1,5 @@
 from datetime import datetime
-import json
 import sqlite3
-import os
 
 def database_connection():
     return sqlite3.connect("ProjekteDB/projects.db")
