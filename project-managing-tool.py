@@ -458,12 +458,81 @@ def login_menu():
     
     login_connection.closer()
 
+def del_user():
+    login_connection = user_database()
+    cursor = login_connection.cursor()
+
+    username = input("Benutzername: ")
+    password = getpass.getpass("Passwort: ")
+
+    cursor.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor.fetchone()
+
+    if result:
+        stored_passwaord_hash = result[0]
+
+        passwort_hash = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            b'some_salt',
+            100000
+        )
+
+        if passwort_hash == stored_passwaord_hash and username == 'Admin':
+            print("Login erfolgreich!")
+
+    cursor.execute("SELECT benutzername FROM userdata")
+    users = cursor.fetchall()
+
+    if users:
+        print("Liste der Benutzer: ")
+        for user in users:
+            print(f"- {user[0]}")
+        delete_explicit()
+
+
+def delete_explicit():
+    login_connection = user_database()
+    cursor = login_connection.cursor()
+    
+    username = input("Gib den Benutzernamen zum Löschen ein: ")
+
+    cursor.execute("SELECT * FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor.fetchall()
+
+    if result:
+        confirm = input(f"Möchtest du den Benutzer {username} wirklich löschen? j/n: ").lower()
+        if confirm == 'j':
+            cursor.execute("DELETE FROM userdata WHERE benutzername = ?", (username,))
+            login_connection.commit()
+            print(f"{username} erfolgreich gelöscht!")
+            again = input("Möchtest du einen weiteren Benutzer löschen? j/n: ").lower()
+            if again == 'j':
+                delete_explicit()
+                return
+            elif again == 'n':
+                start_menu()
+                return
+            else:
+                print("Löschvorgang abgebrochen!")
+        else:
+            print(f"{username} wurde nicht gefunden!")
+    else:
+        print("Es gibt keine Benutzer in der Datenbank!")
+    
+    login_connection.close()
+    start_menu()
+
+
+
 def start_menu():
-    login = input("Einloggen (1) oder Registrieren (2): ")
+    login = input("Einloggen (1), Registrieren (2) oder Benutzer bearbeiten (3): ")
     if login == '1':
         login_menu()
     elif login == '2':
         register()
+    elif login == '3':
+        del_user()
     else:
         print("Falsche Eingabe!")
         start_menu()
