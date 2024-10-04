@@ -8,6 +8,9 @@ def database_connection():
 
 def user_database():
     return sqlite3.connect("UserDB/user.db")
+
+def user_permissions():
+    return sqlite3.connect("UserDB/rbac.db")
     
 aufgaben = []
 
@@ -396,6 +399,9 @@ def register():
                 passwort BLOB NOT NULL
                 )
             ''')
+    cursor.execute("ALTER TABLE userdata ADD COLUMN role_id INTEGER")
+
+    roles()
 
     username = input("Wähle einen Benutzernamen: ")
 
@@ -420,12 +426,29 @@ def register():
             )
             cursor.execute("INSERT INTO userdata (benutzername, passwort) VALUES(?,?)", (username, passwort_hash))
             login_connection.commit()
+            assign_role(username, 'user')
     else:
         print("Falsche Eingabe. Starte Vorgang erneut!")
         register()
 
     login_connection.close()
     login_menu()
+
+def assign_role(username, role):
+    permission_conn = user_permissions()
+    cursor = permission_conn.cursor()
+
+    cursor.execute('''
+                CREATE TABLE IF NOT EXISTS user_roles (
+                   benutzername TEXT NOT NULL,
+                   role_name TEXT NOT NULL,
+                   FOREIGN KEY (role_name) REFERENCES roles(role_name)
+                   )
+                ''')
+    
+    cursor.execute("INSERT INTO user_roles (benutzername, role_name) VALUES (?, ?)", (username, role))
+    permission_conn.commit()
+    permission_conn.close()
 
 def login_menu():
     login_connection = user_database()
@@ -489,6 +512,7 @@ def del_user():
         for user in users:
             print(f"- {user[0]}")
         delete_explicit()
+    login_connection.close()
 
 
 def delete_explicit():
@@ -523,19 +547,142 @@ def delete_explicit():
     login_connection.close()
     start_menu()
 
+def change_role():
+    login_connection = user_database()
+    permission_conn = user_permissions()
+    cursor_login = login_connection.cursor()
+    cursor_permissions = permission_conn.cursor()
+
+    username = input("Benutzername: ")
+    password = getpass.getpass("Passwort: ")
+
+    cursor_login.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor_login.fetchone()
+
+    if result:
+        stored_password_hash = result[0]
+
+        passwort_hash = hashlib.pbkdf2_hmac(
+            'sha256',
+            password.encode('utf-8'),
+            b'some_salt',
+            100000
+        )
+
+        if passwort_hash == stored_password_hash:
+            cursor_permissions.execute("SELECT role_name FROM user_roles WHERE benutzername = ?", (username,))
+            user_role = cursor_permissions.fetchone()
+
+            if user_role and user_role[0] == 'admin':
+                user_to_change = input("Gib den Benutzernamen ein, dessen Rolle geändert werden soll: ")
+                new_role = input("Neue Rolle (admin, manager, user): ")
+
+                cursor_permissions.execute("UPDATE user_roles SET role_name = ? WHERE benutzername = ?", (new_role, user_to_change))
+                permission_conn.commit()
+                print(f"Rolle von {user_to_change} erfolgreich zu {new_role} geändert!")
+            else:
+                print("Du hast keine Berechtigung hierzu!")
+        else:
+            print("Falsches Passwort.")
+    else:
+        print("Benutzer nicht gefunden!")
+
+    login_connection.close()
+    permission_conn.close()
+
 
 
 def start_menu():
-    login = input("Einloggen (1), Registrieren (2) oder Benutzer bearbeiten (3): ")
+    login = input("Einloggen (1), Registrieren (2) oder Benutzerrollen ändern (3) Benutzer löschen (4): ")
     if login == '1':
         login_menu()
     elif login == '2':
         register()
     elif login == '3':
+        change_role()
+    elif login == '4':
         del_user()
     else:
         print("Falsche Eingabe!")
         start_menu()
+
+
+def roles():
+    conn = user_permissions()
+    cursor = conn.cursor()
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS roles (
+                   id INTEGER PRIMARY KEY,
+                   role_name TEXT UNIQUE
+                   )
+                ''')
+    
+    cursor.execute("INSERT INTO roles (role_name) VALUES ('admin'), ('manager'), ('user')")
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS permissions(
+                   id INTEGER PRIMARY KEY,
+                   permission_name TEXT UNIQUE
+                   )
+                ''')
+    
+    cursor.execute("INSERT INTO permissions (permission_name) VALUES ('create'), ('read'), ('update'), ('delete')")
+
+    cursor.execute('''CREATE TABLE IF NOT EXISTS role_permissions (
+                   role_id INTEGER,
+                   permission_id INTEGER,
+                   FOREIGN KEY(role_id) REFERENCES roles(id),
+                   FOREIGN KEY(permission_id) REFERENCES permissions(id))''')
+
+    cursor.execute('''INSERT INTO role_permissions (role_id, permission_id)
+                   VALUES ((SELECT id FROM roles WHERE role_name = 'admin'), (SELECT id FROM permissions WHERE permission_name = 'create')),
+                          ((SELECT id FROM roles WHERE role_name = 'admin'), (SELECT id FROM permissions WHERE permission_name = 'read')),
+                           ((SELECT id FROM roles WHERE role_name = 'admin'), (SElECT id FROM permissions WHERE permission_name = 'update')),
+                            ((SELECT id FROM roles WHERE role_name = 'admin'), (SELECT id FROM permissions WHERE permission_name = 'delete'))
+                    ''')
+    
+    cursor.execute('''INSERT INTO role_permissions (role_id, permission_id)
+                   VALUES ((SELECT id FROM roles WHERE role_name = 'manager'), (SELECT id FROM permissions WHERE permission_name = 'create')),
+                          ((SELECT id FROM roles WHERE role_name = 'manager'), (SELECT id FROM permissions WHERE permission_name = 'read')),
+                           ((SELECT id FROM roles WHERE role_name = 'manager'), (SElECT id FROM permissions WHERE permission_name = 'update'))
+                    ''')
+    
+    cursor.execute('''INSERT INTO role_permissions (role_id, permission_id)
+                        VALUES  ((SELECT id FROM roles WHERE role_name = 'user'), (SELECT id FROM permissions WHERE permission_name = 'read'))
+                    ''')
+    
+    conn.commit()
+    conn.close()
+
+
+def check_permission(username, action):
+    conn = user_permissions()
+    cursor = user_permissions.cursor()
+
+    cursor.execute('''
+            SELECT r.role_name
+            FROM userdata u
+            JOIN roles r ON u.role_ID = r.id
+            WHERE u.username = ?
+            ''', (username,))
+    
+    role = cursor.fetchone()
+
+    if role is None:
+        conn.close()
+        return False
+    
+    cursor.execute('''
+            SELECT p.permission_name
+            FROM role_permissions rp
+            JOIN roles r ON rp.role_id = r.id
+            JOIN permissions p ON rp.permission_id = p.id
+            WHERE r.role_name = ? AND p.permission_name = ?
+            ''', (role[0], action))
+    
+    permission = cursor.fetchone()
+    conn.close()
+
+    return permission is not None
 
 
 
