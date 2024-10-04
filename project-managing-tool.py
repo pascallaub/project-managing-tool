@@ -351,37 +351,48 @@ def beenden():
 
 
 def menu():
+    current_username = current_user('username')
     while True:
         auswahl_menu = input("1. Neues Projekt erstellen\n2. Projekte anzeigen\n3. Projekt bearbeiten\n4. Projekt löschen\n5. Neue Aufgabe zu einem Projekt hinzufügen\n6. Aufgaben anzeigen\n7. Aufgabe bearbeiten\n8. Aufgabe löschen\n9. Aufgaben sortieren\n10. Aufgabe als erledigt markieren\n11. Programm beenden\nTippe eine Zahl ein: ")
         try:
             if auswahl_menu == '1':
+                check_permission(current_username, 'create')
                 neues_projekt()
                 continue
             elif auswahl_menu == '2':
+                check_permission(current_username, 'read')
                 projekt_anzeigen()
                 continue
             elif auswahl_menu == '3':
+                check_permission(current_username, 'update')
                 projekt_bearbeiten()
                 continue
             elif auswahl_menu == '4':
+                check_permission(current_username, 'delete')
                 projekt_del()
                 continue
             elif auswahl_menu == '5':
+                check_permission(current_username, 'create')
                 neue_aufgabe()
                 continue
             elif auswahl_menu == '6':
+                check_permission(current_username, 'read')
                 aufgaben_anzeigen()
                 continue
             elif auswahl_menu == '7':
+                check_permission(current_username, 'update')
                 aufgabe_bearbeiten()
                 continue
             elif auswahl_menu == '8':
+                check_permission(current_username,'delete')
                 aufgabe_del()
                 continue
             elif auswahl_menu == '9':
+                check_permission(current_username, 'read')
                 aufgabe_sort()
                 continue
             elif auswahl_menu == '10':
+                check_permission(current_username, 'update')
                 aufgabe_erledigt()
                 continue
             elif auswahl_menu == '11':
@@ -396,10 +407,18 @@ def register():
     cursor.execute('''
                 CREATE TABLE IF NOT EXISTS userdata (
                 benutzername TEXT NOT NULL,
-                passwort BLOB NOT NULL
+                passwort BLOB NOT NULL,
+                role_id INTEGER
                 )
             ''')
-    cursor.execute("ALTER TABLE userdata ADD COLUMN role_id INTEGER")
+    
+    cursor.execute('''CREATE TABLE IF NOT EXISTS roles (
+                   id INTEGER PRIMARY KEY,
+                   role_name TEXT UNIQUE
+                   )
+                ''')
+    
+    cursor.execute("INSERT INTO roles (role_name) VALUES ('admin'), ('manager'), ('user')")
 
     roles()
 
@@ -450,6 +469,20 @@ def assign_role(username, role):
     permission_conn.commit()
     permission_conn.close()
 
+def current_user(username):
+    login_connection = user_database()
+    cursor = login_connection.cursor()
+
+    cursor.execute("SELECT benutzername FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor.fetchone()
+
+    if result:
+        return result[0]
+    else:
+        return None
+    
+    username = result[0]
+
 def login_menu():
     login_connection = user_database()
     cursor = login_connection.cursor()
@@ -483,16 +516,18 @@ def login_menu():
 
 def del_user():
     login_connection = user_database()
-    cursor = login_connection.cursor()
+    permission_conn = user_permissions()
+    cursor_login = login_connection.cursor()
+    cursor_permissions = permission_conn.cursor()
 
     username = input("Benutzername: ")
     password = getpass.getpass("Passwort: ")
 
-    cursor.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
-    result = cursor.fetchone()
+    cursor_login.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
+    result = cursor_login.fetchone()
 
     if result:
-        stored_passwaord_hash = result[0]
+        stored_password_hash = result[0]
 
         passwort_hash = hashlib.pbkdf2_hmac(
             'sha256',
@@ -501,18 +536,31 @@ def del_user():
             100000
         )
 
-        if passwort_hash == stored_passwaord_hash and username == 'Admin':
-            print("Login erfolgreich!")
+        if passwort_hash == stored_password_hash:
+            cursor_permissions.execute("SELECT role_name FROM user_roles WHERE benutzername = ?", (username,))
+            user_role = cursor_permissions.fetchone()
 
-    cursor.execute("SELECT benutzername FROM userdata")
-    users = cursor.fetchall()
+            if user_role and user_role[0] == 'admin':
+                cursor_login.execute("SELECT passwort FROM userdata WHERE benutzername = ?", (username,))
+                result = cursor_login.fetchone()
 
-    if users:
-        print("Liste der Benutzer: ")
-        for user in users:
-            print(f"- {user[0]}")
-        delete_explicit()
+                cursor_login.execute("SELECT benutzername FROM userdata")
+                users = cursor_login.fetchall()
+
+                if users:
+                    print("Liste der Benutzer: ")
+                    for user in users:
+                        print(f"- {user[0]}")
+                        delete_explicit()
+            else:
+                print("Du hast keine Berechtigung hierzu!")
+        else:
+            print("Falsches Passwort.")
+    else:
+        print("Benutzer nicht gefunden!")
+
     login_connection.close()
+    permission_conn.close()
 
 
 def delete_explicit():
@@ -610,7 +658,15 @@ def start_menu():
 def roles():
     conn = user_permissions()
     cursor = conn.cursor()
+    permission_con = user_database()
+    cursor_user = permission_con.cursor()
 
+    cursor.execute('''CREATE TABLE IF NOT EXISTS permissions(
+                   id INTEGER PRIMARY KEY,
+                   permission_name TEXT UNIQUE
+                   )
+                ''')
+    
     cursor.execute('''CREATE TABLE IF NOT EXISTS roles (
                    id INTEGER PRIMARY KEY,
                    role_name TEXT UNIQUE
@@ -618,12 +674,6 @@ def roles():
                 ''')
     
     cursor.execute("INSERT INTO roles (role_name) VALUES ('admin'), ('manager'), ('user')")
-
-    cursor.execute('''CREATE TABLE IF NOT EXISTS permissions(
-                   id INTEGER PRIMARY KEY,
-                   permission_name TEXT UNIQUE
-                   )
-                ''')
     
     cursor.execute("INSERT INTO permissions (permission_name) VALUES ('create'), ('read'), ('update'), ('delete')")
 
@@ -652,26 +702,31 @@ def roles():
     
     conn.commit()
     conn.close()
+    permission_con.commit()
+    permission_con.close()
 
 
 def check_permission(username, action):
-    conn = user_permissions()
-    cursor = user_permissions.cursor()
+    conn = user_database()
+    permissions_conn = user_permissions()
+    cursor_permissions = permissions_conn.cursor()
+    cursor_login = conn.cursor()
 
-    cursor.execute('''
+    cursor_login.execute('''
             SELECT r.role_name
             FROM userdata u
-            JOIN roles r ON u.role_ID = r.id
-            WHERE u.username = ?
+            JOIN roles r ON u.role_id = r.id
+            WHERE u.benutzername = ?
             ''', (username,))
     
-    role = cursor.fetchone()
+    role = cursor_login.fetchone()
 
     if role is None:
         conn.close()
-        return False
+        raise PermissionDenied("Keine Berechtigung!")
+    menu()
     
-    cursor.execute('''
+    cursor_permissions.execute('''
             SELECT p.permission_name
             FROM role_permissions rp
             JOIN roles r ON rp.role_id = r.id
@@ -679,10 +734,18 @@ def check_permission(username, action):
             WHERE r.role_name = ? AND p.permission_name = ?
             ''', (role[0], action))
     
-    permission = cursor.fetchone()
+    permission = cursor_permissions.fetchone()
     conn.close()
+    permissions_conn.close()
 
-    return permission is not None
+    if permission is None:
+        raise PermissionDenied("Keine Berechtigung!")
+    menu()
+    
+    return True
+
+class PermissionDenied(Exception):
+    pass
 
 
 
